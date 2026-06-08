@@ -5,7 +5,6 @@ import RocChart from '../components/RocChart'
 import RiskDistributionChart from '../components/RiskDistributionChart'
 import ConfusionMatrix from '../components/ConfusionMatrix'
 import PlaceholderCard from '../components/PlaceholderCard'
-import ScoreDistributionChart from "../components/ScoreDistributionChart"
 
 function formatPercent(value) {
   if (value == null || Number.isNaN(Number(value))) return '—'
@@ -22,11 +21,10 @@ function formatCount(value) {
   return Number(value).toLocaleString()
 }
 
-export default function Dashboard() {
+export default function Dashboard({ analysisResult, setAnalysisResult }) {
   const fileInputRef = useRef(null)
 
   const [selectedFile, setSelectedFile] = useState(null)
-  const [analysisResult, setAnalysisResult] = useState(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -71,8 +69,8 @@ export default function Dashboard() {
   }
 
   const validationReport = analysisResult?.validation_report
-  const metrics = analysisResult?.metrics
-  const segmentSummary = analysisResult?.segment_summary
+  const metrics          = analysisResult?.metrics
+  const segmentSummary   = analysisResult?.segment_summary
 
   const validationStatusLabel = validationReport?.validation_status ? 'Valid' : 'Invalid'
   const metricItems = [
@@ -87,131 +85,59 @@ export default function Dashboard() {
   return (
     <main className="dashboard-main">
 
-      {/* ── Section 1: Upload + Analysis Controls (side by side) ─────────── */}
+      {/* ── Upload Card (only before analysis) ───────────────────────────── */}
       {!isAnalyzing && !analysisResult && (
-      <div className="dashboard-row">
-        {/* Upload Card */}
-        <section className="card dashboard-col">
-          <div className="card-header">
-            <h2>Data Upload</h2>
-            <p>Upload a credit portfolio file to begin analysis.</p>
-          </div>
-
-          <div className="upload-actions">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.xlsx"
-              onChange={handleFileChange}
-              className="file-input"
-            />
-            <button type="button" className="btn btn-secondary" onClick={handleUploadClick}>
-              Choose File
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleRunAnalysis}
-              disabled={isAnalyzing}
-            >
-              {isAnalyzing && <span className="spinner" aria-hidden="true" />}
-              {isAnalyzing ? 'Running Analysis...' : 'Run Analysis'}
-            </button>
-          </div>
-
-          {isAnalyzing && (
-            <div className="loading-banner" role="status" aria-live="polite">
-              <span className="spinner spinner-lg" aria-hidden="true" />
-              <span>Processing dataset and generating insights...</span>
+        <div className="dashboard-row">
+          <section className="card dashboard-col">
+            <div className="card-header">
+              <h2>Data Upload</h2>
+              <p>Upload a credit portfolio file to begin analysis.</p>
             </div>
-          )}
 
-          {errorMessage && (
-            <div className="error-banner" role="alert">
-              {errorMessage}
-            </div>
-          )}
-
-          <p className="upload-hint">
-            {selectedFile
-              ? `Selected file: ${selectedFile.name}`
-              : 'Supported formats: CSV, XLSX'}
-          </p>
-        </section>
-
-        {/* Analysis Controls Card
-        <section className="card dashboard-col">
-          <div className="card-header">
-            <h2>Analysis Controls</h2>
-            <p>Configure thresholds before running or re-running analysis.</p>
-          </div>
-
-          <div className="summary-grid">
-            <div className="summary-item">
-              <label className="summary-label" htmlFor="prediction-threshold">
-                Prediction Threshold
-              </label>
+            <div className="upload-actions">
               <input
-                id="prediction-threshold"
-                type="number"
-                min="0"
-                max="1"
-                step="0.01"
-                value={predictionThreshold}
-                onChange={(e) => setPredictionThreshold(Number(e.target.value))}
-                className="threshold-input"
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx"
+                onChange={handleFileChange}
+                className="file-input"
               />
+              <button type="button" className="btn btn-secondary" onClick={handleUploadClick}>
+                Choose File
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleRunAnalysis}
+                disabled={isAnalyzing}
+              >
+                {isAnalyzing && <span className="spinner" aria-hidden="true" />}
+                {isAnalyzing ? 'Running Analysis...' : 'Run Analysis'}
+              </button>
             </div>
 
-            <div className="summary-item">
-              <label className="summary-label" htmlFor="good-threshold">
-                Good Threshold
-              </label>
-              <input
-                id="good-threshold"
-                type="number"
-                min="0"
-                max="1"
-                step="0.01"
-                value={goodThreshold}
-                onChange={(e) => setGoodThreshold(Number(e.target.value))}
-                className="threshold-input"
-              />
-            </div>
+            {errorMessage && (
+              <div className="error-banner" role="alert">
+                {errorMessage}
+              </div>
+            )}
 
-            <div className="summary-item">
-              <label className="summary-label" htmlFor="bad-threshold">
-                Bad Threshold
-              </label>
-              <input
-                id="bad-threshold"
-                type="number"
-                min="0"
-                max="1"
-                step="0.01"
-                value={badThreshold}
-                onChange={(e) => setBadThreshold(Number(e.target.value))}
-                className="threshold-input"
-              />
-            </div>
-          </div>
-
-          <div style={{ marginTop: '20px' }}>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleRunAnalysis}
-              disabled={isAnalyzing || !selectedFile}
-            >
-              {isAnalyzing && <span className="spinner" aria-hidden="true" />}
-              {isAnalyzing ? 'Running Analysis...' : 'Recalculate Results'}
-            </button>
-          </div>
-        </section> */}
-
-      </div>
+            <p className="upload-hint">
+              {selectedFile
+                ? `Selected file: ${selectedFile.name}`
+                : 'Supported formats: CSV, XLSX'}
+            </p>
+          </section>
+        </div>
       )}
-      {/* ── End Section 1 ────────────────────────────────────────────────── */}
+
+      {/* ── Loading state ─────────────────────────────────────────────────── */}
+      {isAnalyzing && (
+        <div className="loading-banner" role="status" aria-live="polite">
+          <span className="spinner spinner-lg" aria-hidden="true" />
+          <span>Processing dataset and generating insights...</span>
+        </div>
+      )}
 
       {/* ── Placeholder ──────────────────────────────────────────────────── */}
       {!analysisResult && !isAnalyzing && (
@@ -252,11 +178,7 @@ export default function Dashboard() {
                 </div>
                 <div className="summary-item">
                   <span className="summary-label">Validation Status</span>
-                  <strong
-                    className={
-                      validationReport?.validation_status ? 'status-valid' : 'status-invalid'
-                    }
-                  >
+                  <strong className={validationReport?.validation_status ? 'status-valid' : 'status-invalid'}>
                     {validationStatusLabel}
                   </strong>
                 </div>
@@ -342,7 +264,8 @@ export default function Dashboard() {
 
           </div>
           {/* ── End Dataset Summary + Analysis Controls ────────────────────── */}
-          {/* ── Section 3: Model Metrics (full width) ────────────────────── */}
+
+          {/* ── Model Metrics (full width) ────────────────────────────────── */}
           {metrics ? (
             <section className="card">
               <div className="card-header">
@@ -369,7 +292,7 @@ export default function Dashboard() {
             </section>
           )}
 
-          {/* ── Section 4: Risk Segmentation (full width) ────────────────── */}
+          {/* ── Risk Segmentation (full width) ────────────────────────────── */}
           {segmentSummary && segmentSummary.length > 0 && (
             <section className="card">
               <div className="card-header">
@@ -400,7 +323,7 @@ export default function Dashboard() {
             </section>
           )}
 
-          {/* ── Section 5: ROC Curve + Confusion Matrix (side by side) ───── */}
+          {/* ── ROC Curve + Confusion Matrix (side by side) ───────────────── */}
           <div className="dashboard-row dashboard-row--stretch">
 
             {analysisResult?.roc_data ? (
@@ -433,37 +356,15 @@ export default function Dashboard() {
             )}
 
           </div>
-          {/* ── End Section 5 ──────────────────────────────────────────────── */}
 
-          {/* ── Section 6: Risk Distribution + Score Distribution (side by side) */}
-          <div className="dashboard-row dashboard-row--stretch">
-
-            {segmentSummary && segmentSummary.length > 0 ? (
+          {/* ── Risk Distribution (full width) ────────────────────────────── */}
+          {segmentSummary && segmentSummary.length > 0 && (
+            <div className="dashboard-row">
               <div className="dashboard-col">
                 <RiskDistributionChart segmentSummary={segmentSummary} />
               </div>
-            ) : (
-              <div className="dashboard-col">
-                <PlaceholderCard title="Risk Distribution" />
-              </div>
-            )}
-
-            <div className="dashboard-col">
-              <ScoreDistributionChart pdValues={analysisResult?.pd_values || []} />
             </div>
-          </div>
-          {/* ── End Section 6 ──────────────────────────────────────────────── */}
-
-          {/* ── Section 7: PD Distribution + Risk Gauge (side by side) ────── */}
-          <div className="dashboard-row dashboard-row--stretch">
-            <div className="dashboard-col">
-              <PlaceholderCard title="PD Distribution" />
-            </div>
-            <div className="dashboard-col">
-              <PlaceholderCard title="Risk Gauge" />
-            </div>
-          </div>
-          {/* ── End Section 7 ──────────────────────────────────────────────── */}
+          )}
 
         </>
       )}

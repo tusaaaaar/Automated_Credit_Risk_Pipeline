@@ -8,10 +8,10 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
+from backend.validator import validate_dataset
 from backend.pipeline import CreditRiskPipeline, PipelineError
 
 # Application and artifact paths
@@ -60,9 +60,94 @@ def root() -> dict[str, str]:
     """Health-check endpoint."""
     return {"message": "Credit Risk Dashboard API Running"}
 
+def build_data_quality_report(validation_result: dict[str, Any]) -> dict[str, Any]:
+    """Build issue log and recommendations from a validation result."""
+    issue_log = []
+    recommendations = []
+
+    if validation_result.get("missing_columns"):
+        issue_log.append({
+            "issue": "Missing Columns",
+            "detail": f"Required column(s) absent: {', '.join(validation_result['missing_columns'])}.",
+            "severity": "Critical",
+        })
+        recommendations.append({
+            "issue": "Missing Columns",
+            "severity": "Critical",
+            "recommendation": (
+                "Schema correction required. Ensure all required columns are present "
+                "before uploading. Verify the data export process matches the expected "
+                "feature set and contact the data engineering team if columns were "
+                "recently renamed or deprecated."
+            ),
+        })
+
+    if validation_result.get("duplicate_rows", 0) > 0:
+        issue_log.append({
+            "issue": "Duplicate Rows",
+            "detail": f"{validation_result['duplicate_rows']:,} duplicate row(s) found.",
+            "severity": "High",
+        })
+        recommendations.append({
+            "issue": "Duplicate Rows",
+            "severity": "High",
+            "recommendation": (
+                "Remove duplicate records before modeling. Run a deduplication pass "
+                "using a unique key such as customer ID or account number, retaining "
+                "the most recent record per key. Investigate the data ingestion "
+                "pipeline to prevent duplicates at source."
+            ),
+        })
+
+    if validation_result.get("missing_values", 0) > 0:
+        issue_log.append({
+            "issue": "Missing Values",
+            "detail": f"{validation_result['missing_values']:,} missing value(s) detected.",
+            "severity": "Medium",
+        })
+        recommendations.append({
+            "issue": "Missing Values",
+            "severity": "Medium",
+            "recommendation": (
+                "Impute or remove missing values before modeling. Apply mean, median, "
+                "or mode imputation for numeric fields. For categorical fields, use the "
+                "most frequent value or a dedicated 'Unknown' category. If the missing "
+                "rate exceeds 40% for a column, consider excluding it from analysis."
+            ),
+        })
+
+    return {
+        "data_quality_report": validation_result,
+        "issue_log": issue_log,
+        "recommendations": recommendations,
+    }
+
+
+@app.post("/data-quality")
+async def data_quality(file: UploadFile = File(...)) -> JSONResponse:
+    """
+    Upload a dataset and return a data quality report only.
+
+    Does not execute the model pipeline, predictions, or segmentation.
+    """
+    try:
+        dataframe = await _read_uploaded_dataframe(file)
+        validation_result = validate_dataset(dataframe)
+        response_body = build_data_quality_report(validation_result)
+        return JSONResponse(content=response_body)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print("ERROR:", repr(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 @app.post("/upload")
-async def upload_dataset(file: UploadFile = File(...)) -> JSONResponse:
+async def upload_dataset(
+    file: UploadFile = File(...),
+    prediction_threshold: float = Form(0.50),
+    good_threshold: float = Form(0.30),
+    bad_threshold: float = Form(0.70),
+) -> JSONResponse:
     """
     Upload a credit-risk dataset and run the inference pipeline.
 
@@ -71,24 +156,24 @@ async def upload_dataset(file: UploadFile = File(...)) -> JSONResponse:
     """
     try:
         dataframe = await _read_uploaded_dataframe(file)
-        result = get_pipeline().run(dataframe)
+        result = get_pipeline().run(
+            dataframe,
+            prediction_threshold=prediction_threshold,
+            good_threshold=good_threshold,
+            bad_threshold=bad_threshold,
+        )
         response_body = _build_response(result)
         return JSONResponse(content=response_body)
     except HTTPException:
         raise
     except PipelineError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-    # except Exception as exc:
-    #     raise HTTPException(
-    #         status_code=500,
-    #         detail="An unexpected error occurred while processing the upload.",
-    #     ) from exc
     except Exception as exc:
         print("ERROR:", repr(exc))
         raise HTTPException(
             status_code=500,
             detail=str(exc),
-        ) from exc  
+        ) from exc
 
 async def _read_uploaded_dataframe(file: UploadFile) -> pd.DataFrame:
     """
@@ -131,7 +216,6 @@ async def _read_uploaded_dataframe(file: UploadFile) -> pd.DataFrame:
 
     return dataframe
 
-
 def _build_response(result: dict[str, Any]) -> dict[str, Any]:
     """Serialize pipeline output for JSON responses."""
     segment_summary = result["segment_summary"]
@@ -141,14 +225,24 @@ def _build_response(result: dict[str, Any]) -> dict[str, Any]:
         else segment_summary
     )
 
-    return {
-    "validation_report": result["validation_report"],
-    "metrics": result.get("metrics"),
-    "roc_data": result.get("roc_data"),
-    "segment_summary": segment_summary_payload,
-    "sample_predictions": (
-        result["predictions"]
-        .head(20)
-        .to_dict(orient="records")
+    predictions_df = result["predictions"]
+
+    pd_values = (
+        predictions_df["probability_of_default"].round(4).tolist()
+        if "probability_of_default" in predictions_df.columns
+        else []
     )
-}
+
+    return {
+        "validation_report": result["validation_report"],
+        "metrics": result.get("metrics"),
+        "roc_data": result.get("roc_data"),
+        "confusion_matrix": result.get("confusion_matrix"),
+        "segment_summary": segment_summary_payload,
+        "pd_values": pd_values,
+        "sample_predictions": (
+            predictions_df
+            .head(20)
+            .to_dict(orient="records")
+        )
+    }

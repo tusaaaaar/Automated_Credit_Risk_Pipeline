@@ -22,6 +22,26 @@
   box-sizing: border-box;
 }
 
+/* ── App Layout ──────────────────────────────────────────────────────────── */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.app-content {
+  margin-left: 240px;
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .app-content {
+    margin-left: 0;
+    margin-top: 60px;
+  }
+}
+
 body {
   margin: 0;
   font-family: Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -411,4 +431,264 @@ body {
   font-size: 20px;
   font-weight: 600;
   margin-bottom: 20px;
+}
+
+.threshold-input {
+  margin-top: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1e293b;
+  background: #f8fafc;
+  outline: none;
+}
+.threshold-input:focus {
+  border-color: #3b82f6;
+  background: #ffffff;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 240px;
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.04);
+}
+
+.sidebar-header {
+  padding: 24px 20px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sidebar-logo-icon {
+  width: 38px;
+  height: 38px;
+  background: #1e40af;
+  color: #ffffff;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.sidebar-brand {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.sidebar-brand-sub {
+  font-size: 11px;
+  color: #94a3b8;
+  margin: 0;
+  line-height: 1.2;
+  font-weight: 500;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 20px 12px;
+  overflow-y: auto;
+}
+
+.sidebar-nav-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0 0 8px 8px;
+}
+
+.sidebar-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748b;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+  cursor: pointer;
+}
+
+.sidebar-nav-item:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.sidebar-nav-item--active {
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.sidebar-nav-item--active:hover {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.sidebar-nav-icon {
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.sidebar-footer {
+  padding: 16px 20px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-footer-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+}
+
+.sidebar-footer-text {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* ── Sidebar responsive ──────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%;
+    height: auto;
+    position: relative;
+    flex-direction: row;
+    align-items: center;
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+
+  .sidebar-header {
+    border-bottom: none;
+    border-right: 1px solid #f1f5f9;
+    padding: 12px 16px;
+  }
+
+  .sidebar-nav {
+    padding: 8px 12px;
+    flex: 1;
+  }
+
+  .sidebar-nav-label {
+    display: none;
+  }
+
+  .sidebar-nav-list {
+    flex-direction: row;
+  }
+
+  .sidebar-footer {
+    border-top: none;
+    border-left: 1px solid #f1f5f9;
+    padding: 12px 16px;
+  }
+}
+
+/* ── PlaceholderCard ─────────────────────────────────────────────────────── */
+.placeholder-card-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  gap: 12px;
+}
+
+.placeholder-card-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.placeholder-card-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #94a3b8;
+  margin: 0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── Dashboard Grid Layout ───────────────────────────────────────────────── */
+.dashboard-row {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.dashboard-row--stretch {
+  align-items: stretch;
+}
+
+.dashboard-col {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .dashboard-row {
+    flex-direction: column;
+  }
+}
+
+/* ── Dashboard Row Enhancements ──────────────────────────────────────────── */
+
+.dashboard-row--stretch > .dashboard-col,
+.dashboard-row--stretch > .dashboard-col > .card,
+.dashboard-row--stretch > .dashboard-col > .chart-card {
+  height: 100%;
+}
+
+.dashboard-col > .chart-card {
+  margin-top: 0;
+}
+
+.dashboard-main > .dashboard-row {
+  margin-top: 0;
+}
+
+.dashboard-col > .card {
+  height: 100%;
 }

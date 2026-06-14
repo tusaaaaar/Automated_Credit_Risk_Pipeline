@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import (
     accuracy_score,
+    cohen_kappa_score,
     confusion_matrix,
     f1_score,
     precision_score,
@@ -32,6 +33,7 @@ class MetricsResult(TypedDict):
     f1_score: float
     auc: float
     gini: float
+    kappa: float
 
 
 class ConfusionMatrixResult(TypedDict):
@@ -60,6 +62,7 @@ class ModelSummaryResult(TypedDict):
     f1_score: float
     auc: float
     gini: float
+    kappa: float
     tn: int
     fp: int
     fn: int
@@ -73,6 +76,7 @@ METRICS_RESULT_KEYS: tuple[str, ...] = (
     "f1_score",
     "auc",
     "gini",
+    "kappa",
 )
 CONFUSION_MATRIX_RESULT_KEYS: tuple[str, ...] = ("tn", "fp", "fn", "tp")
 
@@ -98,8 +102,8 @@ class CreditRiskMetrics:
 
         Returns:
             A dictionary containing ``accuracy``, ``precision``, ``recall``,
-            ``f1_score``, ``auc``, and ``gini`` (where
-            ``gini = (2 * auc) - 1``).
+            ``f1_score``, ``auc``, ``gini`` (where ``gini = (2 * auc) - 1``),
+            and ``kappa`` (Cohen's Kappa Statistic).
 
         Raises:
             MetricsError: If inputs are empty, lengths differ, or computation
@@ -140,6 +144,7 @@ class CreditRiskMetrics:
             )
             auc = float(roc_auc_score(true_labels, predicted_probabilities))
             gini = float((2.0 * auc) - 1.0)
+            kappa = float(cohen_kappa_score(true_labels, predicted_labels))
         except Exception as exc:
             raise MetricsError("Failed to calculate performance metrics.") from exc
 
@@ -150,6 +155,7 @@ class CreditRiskMetrics:
             "f1_score": f1,
             "auc": auc,
             "gini": gini,
+            "kappa": kappa,
         }
 
     def get_confusion_matrix(
@@ -272,6 +278,7 @@ class CreditRiskMetrics:
             "f1_score": float(validated_metrics["f1_score"]),
             "auc": float(validated_metrics["auc"]),
             "gini": float(validated_metrics["gini"]),
+            "kappa": float(validated_metrics["kappa"]),
             "tn": int(validated_confusion_matrix["tn"]),
             "fp": int(validated_confusion_matrix["fp"]),
             "fn": int(validated_confusion_matrix["fn"]),

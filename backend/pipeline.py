@@ -32,6 +32,7 @@ from backend.validator import ValidationResult, validate_dataset
 from backend.visualizer import CreditRiskVisualizer
 
 TARGET_COLUMN = "default.payment.next.month"
+ACTUAL_DEFAULT_COLUMN = "actual_default"
 
 
 class PipelineError(Exception):
@@ -47,7 +48,8 @@ class PipelineResult(TypedDict, total=False):
     metrics: MetricsResult
     confusion_matrix: ConfusionMatrixResult
     roc_data: ROCDataResult
-    validation_report:ValidationResult
+    validation_report: ValidationResult
+
 
 class CreditRiskPipeline:
     """
@@ -100,8 +102,9 @@ class CreditRiskPipeline:
             1. Validate the input dataset
             2. Preprocess features
             3. Predict default probability and class labels
-            4. Segment customers by risk category
-            5. Summarize segment distribution
+            4. Attach ground-truth labels when available
+            5. Segment customers by risk category
+            6. Summarize segment distribution
 
         When ``default.payment.next.month`` is available, the result also
         includes ``metrics``, ``confusion_matrix``, and ``roc_data``.
@@ -128,10 +131,16 @@ class CreditRiskPipeline:
             self._ensure_valid_dataset(validation_result)
 
             preprocessed_df = self.preprocessor.preprocess(df)
+
             predictions = self.predictor.predict(
                 preprocessed_df,
                 prediction_threshold=prediction_threshold,
             )
+
+            # Add actual default values when target exists
+            if TARGET_COLUMN in df.columns:
+                predictions["actual_default"] = df[TARGET_COLUMN]
+
             segmentation = self.segmentation.segment_customers(
                 predictions,
                 good_threshold=good_threshold,

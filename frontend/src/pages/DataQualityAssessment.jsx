@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
 import { uploadDataQuality } from '../services/api'
+import MissingValueAnalysis from '../components/MissingValueAnalysis'
+import DuplicateCustomerAnalysis from '../components/DuplicateCustomerAnalysis'
 
 function formatCount(value) {
   if (value == null || Number.isNaN(Number(value))) return '—'
@@ -30,7 +32,58 @@ function SeverityBadge({ severity }) {
     </span>
   )
 }
+function GroupedIssueCard({ title, severity, summary, details }) {
+  const [open, setOpen] = useState(false)
+  const s = SEVERITY_STYLES[severity] || SEVERITY_STYLES.Low
+  return (
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px' }}>{title}</span>
+          <SeverityBadge severity={severity} />
+          <span style={{ color: '#64748b', fontSize: '13px' }}>{summary}</span>
+        </div>
+        <button type="button" onClick={() => setOpen(p => !p)} style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '4px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: '#2563eb' }}>
+          {open ? 'Hide Details ▲' : 'Show Details ▼'}
+        </button>
+      </div>
+      {open && (
+        <div style={{ padding: '0 16px 14px', borderTop: '1px solid #e2e8f0' }}>
+          <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column' }}>{details}</div>
+        </div>
+      )}
+    </div>
+  )
+}
 
+function GroupedRecCard({ index, title, severity, summary, bullets, details }) {
+  const [open, setOpen] = useState(false)
+  const s = SEVERITY_STYLES[severity] || SEVERITY_STYLES.Low
+  return (
+    <div style={{ padding: '16px 18px', border: '1px solid #e2e8f0', borderLeft: `4px solid ${s.border}`, borderRadius: '12px', background: '#f8fafc' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#e2e8f0', color: '#475569', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{index}</span>
+          <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px' }}>{title}</span>
+          <SeverityBadge severity={severity} />
+          <span style={{ color: '#64748b', fontSize: '13px' }}>{summary}</span>
+        </div>
+        <button type="button" onClick={() => setOpen(p => !p)} style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '4px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: '#2563eb' }}>
+          {open ? 'Hide Details ▲' : 'Show Details ▼'}
+        </button>
+      </div>
+      <ul style={{ margin: '0 0 0 8px', padding: '0 0 0 16px', color: '#475569', fontSize: '13px', lineHeight: 1.8 }}>
+        {bullets.map((b, i) => <li key={i}>{b}</li>)}
+      </ul>
+      {open && (
+        <div style={{ marginTop: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+          <p style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Per-Record Details</p>
+          {details}
+        </div>
+      )}
+    </div>
+  )
+}
 export default function DataQualityAssessment() {
   const fileInputRef = useRef(null)
 
@@ -71,7 +124,19 @@ export default function DataQualityAssessment() {
   const report       = result?.data_quality_report
   const issueLog     = result?.issue_log     ?? []
   const recommendations = result?.recommendations ?? []
+  // ── Group issue log ──────────────────────────────────────────────────────
+  const missingValueIssues    = issueLog.filter(i => i.issue === 'Missing Values')
+  const duplicateIssues       = issueLog.filter(i => i.issue === 'Duplicate Customer Record')
+  const otherIssues           = issueLog.filter(i => i.issue !== 'Missing Values' && i.issue !== 'Duplicate Customer Record')
 
+  const missingRecs    = recommendations.filter(r => r.issue === 'Missing Values')
+  const duplicateRecs  = recommendations.filter(r => r.issue === 'Duplicate Customer Record')
+  const otherRecs      = recommendations.filter(r => r.issue !== 'Missing Values' && r.issue !== 'Duplicate Customer Record')
+
+  const highestSeverity = (items) => {
+    const order = { High: 3, Medium: 2, Low: 1, Critical: 4 }
+    return items.reduce((best, i) => (order[i.severity] ?? 0) > (order[best] ?? 0) ? i.severity : best, items[0]?.severity ?? 'Low')
+  }
   return (
     <main className="dashboard-main">
 
@@ -143,42 +208,39 @@ export default function DataQualityAssessment() {
       {result && (
         <>
 
-          {/* ── Data Quality Report ───────────────────────────────────────── */}
+          {/* ── Dataset Profile ───────────────────────────────────────────── */}
           <section className="card">
             <div className="card-header">
-              <h2>Data Quality Report</h2>
-              <p>Validation results for: <strong>{selectedFile?.name}</strong></p>
+              <h2>Dataset Profile</h2>
+              <p>Structural overview for: <strong>{selectedFile?.name}</strong></p>
             </div>
 
             <div className="summary-grid" style={{ marginTop: '1.5rem' }}>
               <div className="summary-item">
-                <span className="summary-label">Validation Status</span>
-                <strong style={{
-                  color: report?.validation_status ? '#15803d' : '#b91c1c',
-                  fontSize: '1.2rem',
-                  fontWeight: 700,
-                }}>
-                  {report?.validation_status ? 'Valid' : 'Invalid'}
-                </strong>
-              </div>
-              <div className="summary-item">
                 <span className="summary-label">Total Rows</span>
-                <strong>{formatCount(report?.total_rows)}</strong>
+                <strong>{formatCount(result?.dataset_profile?.total_rows)}</strong>
               </div>
               <div className="summary-item">
                 <span className="summary-label">Total Columns</span>
-                <strong>{formatCount(report?.total_columns)}</strong>
+                <strong>{formatCount(result?.dataset_profile?.total_columns)}</strong>
               </div>
               <div className="summary-item">
-                <span className="summary-label">Missing Values</span>
-                <strong>{formatCount(report?.missing_values)}</strong>
+                <span className="summary-label">Numeric Columns</span>
+                <strong>{formatCount(result?.dataset_profile?.numeric_columns)}</strong>
               </div>
               <div className="summary-item">
-                <span className="summary-label">Duplicate Rows</span>
-                <strong>{formatCount(report?.duplicate_rows)}</strong>
+                <span className="summary-label">Categorical Columns</span>
+                <strong>{formatCount(result?.dataset_profile?.categorical_columns)}</strong>
+              </div>
+              <div className="summary-item">
+                <span className="summary-label">Columns With Missing Values</span>
+                <strong>{formatCount(result?.missing_value_analysis?.length ?? 0)}</strong>
+              </div>
+              <div className="summary-item">
+                <span className="summary-label">Duplicate Customer IDs</span>
+                <strong>{formatCount(result?.duplicate_analysis?.length ?? 0)}</strong>
               </div>
             </div>
-
             {/* Re-run controls */}
             <div style={{ marginTop: '1.5rem', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
               <input
@@ -213,7 +275,18 @@ export default function DataQualityAssessment() {
               </div>
             )}
           </section>
-
+          {/* ── Missing Value Analysis ────────────────────────────────────── */}
+          {result?.missing_value_analysis && (
+            <MissingValueAnalysis
+              missingValueAnalysis={result.missing_value_analysis}
+            />
+          )}
+          {/* ── Duplicate Customer Analysis ───────────────────────────────── */}
+          {result?.duplicate_analysis && (
+            <DuplicateCustomerAnalysis
+              duplicateAnalysis={result.duplicate_analysis}
+            />
+          )}
           {/* ── Issue Log ─────────────────────────────────────────────────── */}
           <section className="card">
             <div className="card-header">
@@ -226,44 +299,55 @@ export default function DataQualityAssessment() {
                 ✓ No issues detected. Dataset passed all quality checks.
               </p>
             ) : (
-              <div style={{ marginTop: '1.5rem', overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                      {['Issue', 'Severity', 'Detail'].map((h) => (
-                        <th key={h} style={{
-                          padding: '10px 14px',
-                          textAlign: 'left',
-                          fontWeight: 700,
-                          color: '#64748b',
-                          fontSize: '12px',
-                          letterSpacing: '0.05em',
-                          textTransform: 'uppercase',
-                        }}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {issueLog.map((item, index) => (
-                      <tr key={index} style={{
-                        borderBottom: '1px solid #f1f5f9',
-                        background: index % 2 === 0 ? '#ffffff' : '#f8fafc',
-                      }}>
-                        <td style={{ padding: '12px 14px', fontWeight: 600, color: '#0f172a' }}>
-                          {item.issue}
-                        </td>
-                        <td style={{ padding: '12px 14px' }}>
-                          <SeverityBadge severity={item.severity} />
-                        </td>
-                        <td style={{ padding: '12px 14px', color: '#475569' }}>
-                          {item.detail}
-                        </td>
-                      </tr>
+              <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+                {/* Missing Values group */}
+                {missingValueIssues.length > 0 && (
+                  <GroupedIssueCard
+                    title="Missing Values"
+                    severity={highestSeverity(missingValueIssues)}
+                    summary={`Affected Columns: ${missingValueIssues.length}`}
+                    details={missingValueIssues.map(i => (
+                      <div key={i.column} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #f1f5f9', gap: '12px' }}>
+                        <span style={{ fontWeight: 600, color: '#0f172a', fontSize: '13px' }}>{i.column}</span>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
+                          <span style={{ color: '#64748b', fontSize: '12px' }}>{i.missing_count?.toLocaleString()} missing ({i.missing_percentage}%)</span>
+                          <SeverityBadge severity={i.severity} />
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  />
+                )}
+
+                {/* Duplicate Customer Records group */}
+                {duplicateIssues.length > 0 && (
+                  <GroupedIssueCard
+                    title="Duplicate Customer Records"
+                    severity={highestSeverity(duplicateIssues)}
+                    summary={`Affected Customer IDs: ${duplicateIssues.length}`}
+                    details={duplicateIssues.map(i => (
+                      <div key={i.customer_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #f1f5f9', gap: '12px' }}>
+                        <span style={{ fontWeight: 600, color: '#2563eb', fontSize: '13px' }}>{i.customer_id}</span>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
+                          <span style={{ color: '#64748b', fontSize: '12px' }}>{i.occurrences} occurrences</span>
+                          <SeverityBadge severity={i.severity} />
+                        </div>
+                      </div>
+                    ))}
+                  />
+                )}
+
+                {/* Other issues (unchanged, one per row) */}
+                {otherIssues.map((item, index) => (
+                  <div key={index} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', padding: '14px 16px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc' }}>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: 700, color: '#0f172a', fontSize: '14px' }}>{item.issue}</p>
+                      <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '13px' }}>{item.detail}</p>
+                    </div>
+                    <div style={{ flexShrink: 0 }}><SeverityBadge severity={item.severity} /></div>
+                  </div>
+                ))}
+
               </div>
             )}
           </section>
@@ -281,47 +365,69 @@ export default function DataQualityAssessment() {
               </p>
             ) : (
               <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {recommendations.map((item, index) => {
+
+                {/* Missing Values grouped recommendation */}
+                {missingRecs.length > 0 && (
+                  <GroupedRecCard
+                    index={1}
+                    title="Missing Values"
+                    severity={highestSeverity(missingRecs)}
+                    summary={`Affected Columns: ${missingRecs.length}`}
+                    bullets={[
+                      'Apply mean or median imputation for numeric columns.',
+                      'Use the most frequent value or "Unknown" for categorical columns.',
+                      'Exclude columns where the missing rate exceeds 40%.',
+                      'Investigate upstream data pipelines for root cause.',
+                    ]}
+                    details={missingRecs.map(r => (
+                      <div key={r.column} style={{ padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
+                        <p style={{ margin: '0 0 2px', fontWeight: 600, color: '#0f172a', fontSize: '13px' }}>{r.column} <SeverityBadge severity={r.severity} /></p>
+                        <p style={{ margin: 0, color: '#475569', fontSize: '12px' }}>{r.recommendation}</p>
+                      </div>
+                    ))}
+                  />
+                )}
+
+                {/* Duplicate Customer Records grouped recommendation */}
+                {duplicateRecs.length > 0 && (
+                  <GroupedRecCard
+                    index={missingRecs.length > 0 ? 2 : 1}
+                    title="Duplicate Customer Records"
+                    severity={highestSeverity(duplicateRecs)}
+                    summary={`Affected Customers: ${duplicateRecs.length}`}
+                    bullets={[
+                      'Retain the most recent record per customer ID.',
+                      'Remove all other duplicate records before modelling.',
+                      'Investigate the data ingestion pipeline to prevent recurrence.',
+                      'Implement a uniqueness constraint on the Customer ID column.',
+                    ]}
+                    details={duplicateRecs.map(r => (
+                      <div key={r.customer_id} style={{ padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
+                        <p style={{ margin: '0 0 2px', fontWeight: 600, color: '#2563eb', fontSize: '13px' }}>{r.customer_id}</p>
+                        <p style={{ margin: 0, color: '#475569', fontSize: '12px' }}>{r.recommendation}</p>
+                      </div>
+                    ))}
+                  />
+                )}
+
+                {/* Other recommendations */}
+                {otherRecs.map((item, index) => {
                   const s = SEVERITY_STYLES[item.severity] || SEVERITY_STYLES.Low
                   return (
-                    <div key={index} style={{
-                      padding: '16px 18px',
-                      border: '1px solid #e2e8f0',
-                      borderLeft: `4px solid ${s.border}`,
-                      borderRadius: '12px',
-                      background: '#f8fafc',
-                    }}>
+                    <div key={index} style={{ padding: '16px 18px', border: '1px solid #e2e8f0', borderLeft: `4px solid ${s.border}`, borderRadius: '12px', background: '#f8fafc' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                        <span style={{
-                          width: '22px',
-                          height: '22px',
-                          borderRadius: '50%',
-                          background: '#e2e8f0',
-                          color: '#475569',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                        }}>
-                          {index + 1}
-                        </span>
-                        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px' }}>
-                          {item.issue}
-                        </span>
+                        <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#e2e8f0', color: '#475569', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{index + 1}</span>
+                        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px' }}>{item.issue}</span>
                         <SeverityBadge severity={item.severity} />
                       </div>
-                      <p style={{ margin: 0, color: '#475569', fontSize: '13px', lineHeight: 1.7 }}>
-                        {item.recommendation}
-                      </p>
+                      <p style={{ margin: 0, color: '#475569', fontSize: '13px', lineHeight: 1.7 }}>{item.recommendation}</p>
                     </div>
                   )
                 })}
+
               </div>
             )}
           </section>
-
         </>
       )}
     </main>

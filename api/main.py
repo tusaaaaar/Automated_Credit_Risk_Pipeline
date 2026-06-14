@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from backend.validator import validate_dataset
 from backend.pipeline import CreditRiskPipeline, PipelineError
-
+from backend.dqa import build_dqa_report
 # Application and artifact paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MODEL_PATH = PROJECT_ROOT / "models" / "credit_risk_model.pkl"
@@ -132,8 +132,7 @@ async def data_quality(file: UploadFile = File(...)) -> JSONResponse:
     """
     try:
         dataframe = await _read_uploaded_dataframe(file)
-        validation_result = validate_dataset(dataframe)
-        response_body = build_data_quality_report(validation_result)
+        response_body = build_dqa_report(dataframe)
         return JSONResponse(content=response_body)
     except HTTPException:
         raise
@@ -240,9 +239,12 @@ def _build_response(result: dict[str, Any]) -> dict[str, Any]:
         "confusion_matrix": result.get("confusion_matrix"),
         "segment_summary": segment_summary_payload,
         "pd_values": pd_values,
-        "sample_predictions": (
-            predictions_df
-            .head(20)
-            .to_dict(orient="records")
-        )
+        "scorecard_data": (
+            predictions_df[
+                [col for col in ["probability_of_default", "prediction", "actual_default"]
+                 if col in predictions_df.columns]
+            ].to_dict(orient="records")
+            if "probability_of_default" in predictions_df.columns
+            else []
+        ),
     }

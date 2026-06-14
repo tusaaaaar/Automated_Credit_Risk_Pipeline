@@ -21,6 +21,50 @@ function formatCount(value) {
   return Number(value).toLocaleString()
 }
 
+function getPortfolioHealth(badPct) {
+  if (badPct == null || Number.isNaN(Number(badPct))) return { label: '—', cls: '' }
+  const pct = Number(badPct)
+  if (pct < 5)   return { label: 'Good',     cls: 'status-valid'    }
+  if (pct <= 15) return { label: 'Moderate', cls: 'status-moderate' }
+  return               { label: 'High',     cls: 'status-invalid'  }
+}
+
+function getMetricBadge(key, value) {
+  if (value == null || Number.isNaN(Number(value))) return null
+  const v = Number(value)
+
+  const rules = {
+    auc: [
+      { threshold: 0.8, label: 'Excellent', cls: 'badge-excellent' },
+      { threshold: 0.7, label: 'Good',      cls: 'badge-good'      },
+      { threshold: 0.6, label: 'Fair',      cls: 'badge-fair'      },
+      { threshold: -Infinity, label: 'Poor', cls: 'badge-poor'     },
+    ],
+    gini: [
+      { threshold: 0.6, label: 'Excellent', cls: 'badge-excellent' },
+      { threshold: 0.4, label: 'Good',      cls: 'badge-good'      },
+      { threshold: 0.2, label: 'Fair',      cls: 'badge-fair'      },
+      { threshold: -Infinity, label: 'Poor', cls: 'badge-poor'     },
+    ],
+    kappa: [
+      { threshold: 0.6, label: 'Strong',   cls: 'badge-excellent' },
+      { threshold: 0.4, label: 'Moderate', cls: 'badge-good'      },
+      { threshold: 0.2, label: 'Fair',     cls: 'badge-fair'      },
+      { threshold: -Infinity, label: 'Weak', cls: 'badge-poor'    },
+    ],
+    accuracy: [
+      { threshold: 0.8, label: 'Good', cls: 'badge-good' },
+      { threshold: -Infinity, label: 'Fair', cls: 'badge-fair' },
+    ],
+  }
+
+  const tiers = rules[key]
+  if (!tiers) return null
+
+  const match = tiers.find(t => v >= t.threshold)
+  return match ?? null
+}
+
 export default function Dashboard({ analysisResult, setAnalysisResult }) {
   const fileInputRef = useRef(null)
 
@@ -72,6 +116,16 @@ export default function Dashboard({ analysisResult, setAnalysisResult }) {
   const metrics          = analysisResult?.metrics
   const segmentSummary   = analysisResult?.segment_summary
 
+  const totalCustomers = segmentSummary?.reduce((sum, s) => sum + (s.customer_count ?? 0), 0) ?? null
+  const avgPortfolioPD = segmentSummary?.length
+    ? segmentSummary.reduce((sum, s) => sum + (s.average_pd ?? 0) * (s.customer_count ?? 0), 0) / (totalCustomers || 1)
+    : null
+  const getPct      = (cat) => segmentSummary?.find(s => s.risk_category === cat)?.percentage ?? null
+  const goodPct     = getPct('Good')
+  const moderatePct = getPct('Moderate')
+  const badPct      = getPct('Bad')
+  const health      = getPortfolioHealth(badPct)
+
   const validationStatusLabel = validationReport?.validation_status ? 'Valid' : 'Invalid'
   const metricItems = [
     { key: 'auc',       label: 'AUC'       },
@@ -80,6 +134,7 @@ export default function Dashboard({ analysisResult, setAnalysisResult }) {
     { key: 'precision', label: 'Precision' },
     { key: 'recall',    label: 'Recall'    },
     { key: 'f1_score',  label: 'F1 Score'  },
+    { key: 'kappa',     label: 'Kappa'     },
   ]
 
   return (
@@ -155,10 +210,44 @@ export default function Dashboard({ analysisResult, setAnalysisResult }) {
       {analysisResult && (
         <>
 
+          {/* ── Portfolio Risk Summary ────────────────────────────────────── */}
+          <section className="card">
+            <div className="card-header">
+              <h2>Portfolio Risk Summary</h2>
+              <p>High-level risk indicators across the entire portfolio.</p>
+            </div>
+            <div className="metrics-grid">
+              <div className="metric-card">
+                <span className="metric-label">Total Customers</span>
+                <strong className="metric-value">{formatCount(totalCustomers)}</strong>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">Avg. Portfolio PD</span>
+                <strong className="metric-value">{formatMetric(avgPortfolioPD)}</strong>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">Good Risk %</span>
+                <strong className="metric-value">{formatPercent(goodPct)}</strong>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">Moderate Risk %</span>
+                <strong className="metric-value">{formatPercent(moderatePct)}</strong>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">Bad Risk %</span>
+                <strong className="metric-value">{formatPercent(badPct)}</strong>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">Portfolio Health</span>
+                <strong className={`metric-value ${health.cls}`}>{health.label}</strong>
+              </div>
+            </div>
+          </section>
+
           {/* ── Dataset Summary + Analysis Controls (side by side) ────────── */}
           <div className="dashboard-row dashboard-row--stretch">
 
-            <section className="card dashboard-col">
+            {/* <section className="card dashboard-col">
               <div className="card-header">
                 <h2>Dataset Summary</h2>
                 <p>Overview of the uploaded dataset and validation checks.</p>
@@ -191,7 +280,7 @@ export default function Dashboard({ analysisResult, setAnalysisResult }) {
                   <strong>{formatCount(validationReport?.duplicate_rows)}</strong>
                 </div>
               </div>
-            </section>
+            </section> */}
 
             <section className="card dashboard-col">
               <div className="card-header">
@@ -273,14 +362,22 @@ export default function Dashboard({ analysisResult, setAnalysisResult }) {
                 <p>Classification and ranking performance for the credit-risk model.</p>
               </div>
               <div className="metrics-grid">
-                {metricItems.map((metric) => (
-                  <div key={metric.key} className="metric-card">
-                    <span className="metric-label">{metric.label}</span>
-                    <strong className="metric-value">
-                      {formatMetric(metrics[metric.key])}
-                    </strong>
-                  </div>
-                ))}
+                {metricItems.map((metric) => {
+                  const badge = getMetricBadge(metric.key, metrics[metric.key])
+                  return (
+                    <div key={metric.key} className="metric-card">
+                      <span className="metric-label">{metric.label}</span>
+                      <strong className="metric-value">
+                        {formatMetric(metrics[metric.key])}
+                      </strong>
+                      {badge && (
+                        <span className={`metric-badge ${badge.cls}`}>
+                          {badge.label}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </section>
           ) : (
@@ -356,6 +453,54 @@ export default function Dashboard({ analysisResult, setAnalysisResult }) {
             )}
 
           </div>
+
+          {/* ── Model Interpretation ─────────────────────────────────────────────── */}
+          {metrics?.auc != null && !Number.isNaN(Number(metrics.auc)) && (() => {
+            const auc = Number(metrics.auc)
+            const interpretation =
+              auc >= 0.8 ? {
+                label: 'Excellent Discrimination',
+                cls: 'badge-excellent',
+                explanation: 'The model is highly effective at separating good borrowers from bad ones. It can reliably rank customers by risk, making it well-suited for automated credit decisioning and portfolio management.'
+              } :
+              auc >= 0.7 ? {
+                label: 'Good Discrimination',
+                cls: 'badge-good',
+                explanation: 'The model performs well in distinguishing between low- and high-risk customers. It provides meaningful risk ranking that can support lending decisions, though some borderline cases may need manual review.'
+              } :
+              auc >= 0.6 ? {
+                label: 'Fair Discrimination',
+                cls: 'badge-fair',
+                explanation: 'The model shows moderate ability to separate risk levels. It offers some predictive value but should be used alongside other credit indicators. Consider model refinement or additional features to improve performance.'
+              } : {
+                label: 'Weak Discrimination',
+                cls: 'badge-poor',
+                explanation: 'The model struggles to reliably distinguish between good and bad borrowers. Relying on it alone for credit decisions carries significant risk. A model review, feature engineering, or retraining is strongly recommended.'
+              }
+
+            return (
+              <section className="card">
+                <div className="card-header">
+                  <h2>Model Interpretation</h2>
+                  {/* <p>Business-friendly explanation of model discrimination power based on AUC.</p> */}
+                </div>
+                <div className="metrics-grid" style={{ gridTemplateColumns: '1fr' }}>
+                  <div className="metric-card" style={{ flexDirection: 'row', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '160px' }}>
+                      <span className="metric-label">AUC Score</span>
+                      <strong className="metric-value">{formatMetric(auc)}</strong>
+                      <span className={`metric-badge ${interpretation.cls}`} style={{ alignSelf: 'flex-start' }}>
+                        {interpretation.label}
+                      </span>
+                    </div>
+                    <p style={{ margin: 0, flex: 1, fontSize: '0.9rem', lineHeight: '1.6', opacity: 0.85 }}>
+                      {interpretation.explanation}
+                    </p>
+                  </div>
+                </div>
+              </section>
+            )
+          })()}
 
           {/* ── Risk Distribution (full width) ────────────────────────────── */}
           {segmentSummary && segmentSummary.length > 0 && (

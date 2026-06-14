@@ -27,17 +27,14 @@ function ComingSoonCard({ card }) {
   return (
     <section className="card dashboard-col">
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
           <span style={{ fontSize: '28px', lineHeight: 1 }}>{card.icon}</span>
           <ComingSoonBadge />
         </div>
-
         <div className="card-header" style={{ padding: 0, marginBottom: '24px' }}>
           <h2>{card.title}</h2>
           <p>{card.description}</p>
         </div>
-
         <div style={{
           flex: 1,
           display: 'flex',
@@ -62,14 +59,14 @@ function ComingSoonCard({ card }) {
             Coming Soon
           </p>
         </div>
-
       </div>
     </section>
   )
 }
 
 export default function ScorecardAnalytics({ analysisResult }) {
-  const pdValues = analysisResult?.pd_values || []
+  const pdValues     = analysisResult?.pd_values || []
+  const scorecardData = analysisResult?.scorecard_data || []
 
   return (
     <main className="dashboard-main">
@@ -95,8 +92,8 @@ export default function ScorecardAnalytics({ analysisResult }) {
           </p>
         </div>
 
-        {pdValues.length > 0 ? (
-          <ScoreDistributionChart pdValues={pdValues} />
+        {scorecardData.length > 0 ? (
+          <ScoreDistributionChart scorecardData={scorecardData} />
         ) : (
           <div style={{
             display: 'flex',
